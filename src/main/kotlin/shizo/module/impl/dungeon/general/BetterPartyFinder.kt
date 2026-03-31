@@ -1,0 +1,178 @@
+package shizo.module.impl.dungeon.general
+
+import kotlinx.coroutines.launch
+import net.minecraft.network.chat.ClickEvent
+import net.minecraft.network.chat.Component
+import shizo.Shizo
+import shizo.clickgui.settings.Setting.Companion.withDependency
+import shizo.clickgui.settings.impl.ActionSetting
+import shizo.clickgui.settings.impl.BooleanSetting
+import shizo.clickgui.settings.impl.NumberSetting
+import shizo.clickgui.settings.impl.SelectorSetting
+import shizo.commands.fetchAndDisplayCataStats
+import shizo.events.ChatPacketEvent
+import shizo.events.core.on
+import shizo.module.impl.Module
+import shizo.utils.formatNumber
+import shizo.utils.formatTime
+import shizo.utils.handlers.schedule
+import shizo.utils.modMessage
+import shizo.utils.network.hypixelapi.RequestUtils
+import shizo.utils.sendCommand
+import shizo.utils.skyblock.PartyUtils
+import shizo.utils.skyblock.dungeon.Floor
+import kotlin.collections.iterator
+
+object BetterPartyFinder : Module(
+    name = "Better Party Finder",
+    description = "Provides stats when a player joins your party. Includes autokick functionality.",
+) {
+    private val statsDisplay by BooleanSetting(
+        "Stats display",
+        true,
+        desc = "Displays stats of players who join your party"
+    )
+    private val sendKickLine by BooleanSetting(
+        "Send Kick Line",
+        true,
+        desc = "Sends a line in party chat to kick a player."
+    ).withDependency { statsDisplay }
+
+    private val autoKickToggle by BooleanSetting(
+        "Auto Kick",
+        desc = "Automatically kicks players who don't meet requirements."
+    )
+    private val floor by SelectorSetting(
+        "Floor",
+        "F7",
+        Floor.entries.mapNotNull { if (!it.isMM) it.name else null },
+        desc = "Determines which floor to check pb."
+    ).withDependency { autoKickToggle }
+    private val mmToggle by BooleanSetting(
+        "Master Mode",
+        true,
+        desc = "Use master mode times"
+    ).withDependency { autoKickToggle }
+    private val informKicked by BooleanSetting(
+        "Inform Kicked",
+        desc = "Informs the player why they were kicked."
+    ).withDependency { autoKickToggle }
+    private val maximumSeconds by NumberSetting(
+        "Maximum Seconds",
+        400,
+        60,
+        480,
+        5,
+        desc = "Maximum of seconds for kicking.",
+        unit = "s"
+    ).withDependency { autoKickToggle }
+    private val secretsMin by NumberSetting(
+        "Minimum Secrets",
+        0,
+        0,
+        200,
+        desc = "Secret minimum in thousands for kicking.",
+        unit = "k"
+    ).withDependency { autoKickToggle }
+    private val apiOffKick by BooleanSetting(
+        "Api Off Kick",
+        true,
+        desc = "Kicks if the player's api is off. If this setting is disabled, it will ignore the item check when players have api disabled."
+    ).withDependency { autoKickToggle }
+    private val magicalPowerReq by NumberSetting(
+        "Magical Power",
+        1300,
+        0,
+        2000,
+        20,
+        desc = "Magical power minimum for kicking."
+    ).withDependency { autoKickToggle }
+    private val spiritKick by BooleanSetting(
+        "Spirit Pet",
+        desc = "Kicks if the player doesn't have spirit pet."
+    ).withDependency { autoKickToggle }
+
+    private val petMap = mapOf("SPIRIT" to { spiritKick })
+
+    private val kickCache by BooleanSetting(
+        "Kick Cache",
+        true,
+        desc = "Caches kicked players to automatically kick when they attempt to rejoin."
+    ).withDependency { autoKickToggle }
+    private val action by ActionSetting(
+        "Clear Cache",
+        desc = "Clears the kick list cache."
+    ) { kickedList.clear() }.withDependency { autoKickToggle && kickCache }
+
+    //https://regex101.com/r/XYnAVm/2
+    private val pfRegex = Regex("^Party Finder > (?:\\[.{1,7}])? ?(.{1,16}) joined the dungeon group! \\(.*\\)$")
+
+    private val kickedList = mutableSetOf<String>()
+
+    init {
+        on<ChatPacketEvent> {
+            if (!statsDisplay && !autoKickToggle) return@on
+            val (name) = pfRegex.find(value)?.destructured ?: return@on
+            if (name == mc.player?.name?.string) return@on
+
+            Shizo.scope.launch {
+                val profile = RequestUtils.getProfile(name)
+                if (statsDisplay) fetchAndDisplayCataStats(profile)
+                if (sendKickLine) modMessage(Component.literal("§aPress to kick $name").withStyle {
+                    it.withClickEvent(ClickEvent.RunCommand("/party kick $name"))
+                })
+
+                if (autoKickToggle && PartyUtils.isLeader()) {
+                    if (kickCache && name in kickedList) {
+                        sendCommand("party kick $name")
+                        modMessage("Kicked $name since they have been kicked previously.")
+                        return@launch
+                    }
+
+                    val kickedReasons = mutableListOf<String>()
+
+                    val currentProfile = profile.getOrElse { return@launch modMessage(it.message) }.memberData
+                        ?: return@launch modMessage("Could not find member data for $name")
+
+                    val dungeon =
+                        if (!mmToggle) currentProfile.dungeons.dungeonTypes.catacombs else currentProfile.dungeons.dungeonTypes.mastermode
+                    dungeon.fastestTimeSPlus["$floor"]?.let {
+                        if (maximumSeconds < it / 1000)
+                            kickedReasons.add(
+                                "Did not meet time req for ${if (mmToggle) "m" else "f"}$floor: ${formatTime(it.toLong())}/${
+                                    formatTime(
+                                        maximumSeconds * 1000L,
+                                        0
+                                    )
+                                }"
+                            )
+                    } ?: kickedReasons.add("Couldn't confirm completion status for ${if (mmToggle) "m" else "f"}$floor")
+
+                    currentProfile.dungeons.secrets.let { currentProfile.playerStats.bloodMobKills / 4 + it }.let {
+                        if (it < (secretsMin * 1000)) kickedReasons.add("Did not meet secret req: ${formatNumber(it.toString())}/${secretsMin}k")
+                    }
+
+                    val pets =
+                        currentProfile.pets.pets.mapNotNullTo(HashSet()) { if (it.tier != "LEGENDARY") null else it.type }
+
+                    for (entry in petMap) if (entry.value() && entry.key !in pets) kickedReasons.add("Did not have legendary ${entry.key}")
+
+                    if (currentProfile.inventoryApi) {
+                        val mp = currentProfile.magicalPower
+                        if (mp < magicalPowerReq) kickedReasons.add("Did not meet mp req: ${mp}/$magicalPowerReq")
+                    } else if (apiOffKick) kickedReasons.add("Inventory API is off")
+
+                    if (kickedReasons.isNotEmpty()) {
+                        if (informKicked) {
+                            schedule(6) { sendCommand("party kick $name") }
+                            sendCommand("pc Kicked $name for: ${kickedReasons.joinToString(", ")}")
+                        } else sendCommand("party kick $name")
+
+                        kickedList.add(name)
+                        return@launch modMessage("Kicking $name for: \n${kickedReasons.joinToString(" \n")}")
+                    }
+                }
+            }
+        }
+    }
+}

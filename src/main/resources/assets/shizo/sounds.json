@@ -1,0 +1,32 @@
+{
+  "horn": {
+    "category": "player",
+    "sounds": [
+      "shizo:horn"
+    ]
+  },
+  "build": {
+    "category": "player",
+    "sounds": [
+      "shizo:build"
+    ]
+  },
+  "defeat": {
+    "category": "player",
+    "sounds": [
+      "shizo:defeat"
+    ]
+  },
+  "lego": {
+    "category": "player",
+    "sounds": [
+      "shizo:lego"
+    ]
+  },
+  "start": {
+    "category": "player",
+    "sounds": [
+      "shizo:start"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+	"required": true,
+	"package": "shizo.mixin",
+    "refmap": "shizo.refmap.json",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+      "ExampleMixin",
+      "ConnectionMixin",
+      "ClientPacketListenerMixin",
+      "MixinClientPacketListener",
+      "PacketListenerMixin",
+      "AbstractContainerScreenMixin",
+      "MixinMouseHandler",
+      "MinecraftMixin",
+      "LevelChunkMixin",
+      "BossBarHealthOverlayMixin",
+      "FuckFirmament",
+      "ChatScreenMixin",
+      "EntityRendererMixin",
+      "KeyBindingMixin",
+      "ScreenEffectRendererMixin",
+      "AvatarRendererMixin",
+      "CameraMixin",
+      "WardrobeContainerMixin",
+      "KuudraMixin",
+      "MixinGameRenderer",
+      "MixinKeyboardInput",
+      "MixinScreenEffectRenderer"
+
+	],
+    "client": [
+      "accessors.KeyMappingAccessor",
+      "accessors.AbstractContainerScreenAccessor",
+      "accessors.EntityRendererAccessor",
+      "accessors.CameraAccessor",
+      "accessors.LocalPlayerAccessor",
+      "accessors.MinecraftAccessor",
+      "accessors.DeltaTrackerTimerAccessor",
+      "accessors.CompositeRenderTypeAccessor"
+    ],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

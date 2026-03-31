@@ -1,0 +1,10 @@
+package shizo.events
+
+import shizo.events.core.Event
+import net.minecraft.client.multiplayer.ClientLevel
+
+abstract class TickEvent : Event() {
+    class Start(val world: ClientLevel) : TickEvent()
+    class End(val world: ClientLevel) : TickEvent()
+    class Server : TickEvent()
+}
