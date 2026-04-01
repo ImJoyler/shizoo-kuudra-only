@@ -102,7 +102,7 @@ object ModuleManager {
             KuudraInfo, KuudraPF, KuudraTickTimers, KuudraTrackers, LagTracker,
             NOPre, PearlWaypoints, Priority, ShopHelper,
             StunWaypoints, SupplyHighlighter, Vengeance,
-            Fireball, CrateAura,
+            Fireball, CrateAura, AutoTap,
             // render
             ClickGUIModule, Etherwarp, NoCursorReset,
             PerformanceHUD, PlayerSize, Waypoints,
