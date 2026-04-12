@@ -31,4 +31,4 @@ jobs:
         with:
           name: Release ${{ github.ref_name }} 
           files: target/your-app-name-*.jar 
-          generate_release_notes: true # Auto-generates a changelog based on PRs/commits
+          generate_release_notes: true
