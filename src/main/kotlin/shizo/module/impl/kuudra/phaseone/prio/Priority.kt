@@ -1,6 +1,8 @@
 package shizo.module.impl.kuudra.phaseone.prio
 
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket
+import net.minecraft.world.entity.projectile.ThrownEnderpearl
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import shizo.clickgui.settings.Setting.Companion.withDependency
@@ -11,19 +13,20 @@ import shizo.events.RenderEvent
 import shizo.events.TickEvent
 import shizo.events.WorldEvent
 import shizo.events.core.on
+import shizo.events.core.onReceive
 import shizo.events.core.onSend
 import shizo.module.impl.Module
-import shizo.utils.skyblock.kuudra.PearlUtils.predictPearlLanding
 import shizo.utils.*
 import shizo.utils.renderUtils.renderUtils.drawStyledBox
 import shizo.utils.renderUtils.renderUtils.drawText
 import shizo.utils.renderUtils.renderUtils.textDim
 import shizo.utils.skyblock.kuudra.KuudraUtils
 import shizo.utils.skyblock.kuudra.KuudraUtils.Crate
+import shizo.utils.skyblock.kuudra.PearlUtils
 import kotlin.collections.get
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt 
+import kotlin.math.sqrt
 
 object Priority : Module(
     name = "Crate Priority",
@@ -40,10 +43,11 @@ object Priority : Module(
 
     var pearlLandingPos: Vec3? = null
     var landingPosTimer = 0
+    var myPearlId: Int? = null
 
     var currentPreset: Crate? = null
     var lastInstruction: PriorityConfig.Instruction? = null
-
+    private var predictionThrottle = 0
     private var hudTimer = 0
 
     data class TargetSpot(val name: String, val x: Double, val y: Double, val z: Double)
@@ -54,8 +58,10 @@ object Priority : Module(
             TargetSpot("SQUARE MIDDLE", -138.5, 78.0, -87.5)
         ),
         Crate.XC to listOf(
-            TargetSpot("XC CANNON", -129.5, 78.0, -113.5),
-            TargetSpot("XC MIDDLE", -134.5, 78.0, -124.5),
+            // -129.5 79 -114.5
+            // -129.5 79 -114.5
+            TargetSpot("XC CANNON", -129.5, 78.0, -114.5),
+            TargetSpot("XC MIDDLE", -134.5, 78.0, -127.5),
             TargetSpot("XC COAL", -133.5, 78.0, -129.5)
         ),
         Crate.SHOP to listOf(
@@ -77,11 +83,45 @@ object Priority : Module(
     init {
         PriorityConfig.init()
 
+
+        onReceive<ClientboundAddEntityPacket> {
+            val player = mc.player ?: return@onReceive
+
+            if (this.type == net.minecraft.world.entity.EntityType.ENDER_PEARL) {
+                val spawnPos = Vec3(this.x, this.y, this.z)
+
+                if (player.eyePosition.distanceToSqr(spawnPos) < 2.0) {
+                    myPearlId = this.id
+                }
+            }
+        }
+
         on<TickEvent.Start> {
             if (hudTimer > 0) hudTimer--
+            // test
             if (landingPosTimer > 0) {
-                landingPosTimer--
-                if (landingPosTimer == 0) pearlLandingPos = null
+                val level = mc.level
+                predictionThrottle++
+                if (predictionThrottle >= 5) {
+                    predictionThrottle = 0
+                    if (level != null && myPearlId != null) {
+                        val activePearl = level.getEntity(myPearlId!!)
+
+                        if (activePearl != null) {
+                            val updatedLanding = PearlUtils.predictPearlLandingFromEntity(activePearl)
+                            if (updatedLanding != null) {
+                                pearlLandingPos = updatedLanding
+                                landingPosTimer = 100
+                            }
+                        }
+                    }
+
+                    landingPosTimer--
+                    if (landingPosTimer <= 0) {
+                        pearlLandingPos = null
+                        myPearlId = null
+                    }
+                }
             }
         }
 
@@ -132,11 +172,12 @@ object Priority : Module(
             }
         }
 
-        onSend<ServerboundUseItemPacket>{
+        onSend<ServerboundUseItemPacket> {
             val player = mc.player ?: return@onSend
+
             if (player.mainHandItem.itemId != "ENDER_PEARL") return@onSend
 
-            val predictedLanding = predictPearlLanding()
+            val predictedLanding = PearlUtils.predictPearlLandingFromPlayer()
             if (predictedLanding != null) {
                 pearlLandingPos = predictedLanding
                 landingPosTimer = 100
@@ -196,6 +237,7 @@ object Priority : Module(
             lastInstruction = null
             hudTimer = 0
             pearlLandingPos = null
+            myPearlId = null
         }
     }
 
