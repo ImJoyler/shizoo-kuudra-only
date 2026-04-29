@@ -1,9 +1,8 @@
 # Shizo — Feature List
 Kuudra Only,
 mod comes as it is
-for features u can ask in dm best settings;
-don't uyse fireball in this version it does not work and i can't be bothered ot separate code 
-i won't give dungeons don't ask
+fireball works i was bothered enoguh to copy from main ot here
+maybe if i can be bothered ill also port drone and shit
 # Copyright
 The mod base is odin from odtheking
 as for whajt i made idrc use it
