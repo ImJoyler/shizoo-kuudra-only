@@ -14,16 +14,12 @@ import shizo.events.TickEvent
 import shizo.events.WorldEvent
 import shizo.events.core.on
 import shizo.module.impl.Module
-import shizo.module.impl.cheats.puzzles.solvers.WaterSolver
 import shizo.utils.Color
-import shizo.utils.handlers.EtherwarpUtils
+import shizo.utils.handlers.EtherUtils
 import shizo.utils.modMessage
 import shizo.utils.noControlCodes
 import shizo.utils.renderUtils.renderUtils.drawStyledBox
-import shizo.utils.skyblock.dungeon.DungeonUtils.currentRoom
-import shizo.utils.skyblock.dungeon.DungeonUtils.getRealCoords
 import kotlin.math.floor
-import shizo.module.impl.cheats.joything.InteractiveMapScreen
 import net.minecraft.client.gui.screens.ChatScreen
 object Fireball : Module(
     name = "Fireball",
@@ -80,7 +76,7 @@ object Fireball : Module(
 
             if (!inFireballBuild) return@on
 
-            if  (mc.screen != null && mc.screen !is InteractiveMapScreen && mc.screen !is ChatScreen)  {
+            if  (mc.screen != null /*&& mc.screen !is InteractiveMapScreen*/ && mc.screen !is ChatScreen)  {
                 mc.options.keyShift.setDown(false)
                 return@on
             }
@@ -116,10 +112,10 @@ object Fireball : Module(
                 val sourcePos = expectedPosition ?: return@on
 
                 val dx = nextTarget.x - sourcePos.x
-                val dy = nextTarget.y - (sourcePos.y + EtherwarpUtils.SNEAK_EYE_HEIGHT)
+                val dy = nextTarget.y - (sourcePos.y + EtherUtils.SNEAK_EYE_HEIGHT)
                 val dz = nextTarget.z - sourcePos.z
 
-                val angles = EtherwarpUtils.getYawAndPitch(dx, dy, dz)
+                val angles = EtherUtils.getYawAndPitch(dx, dy, dz)
                 val targetYaw = angles[0]
                 val targetPitch = angles[1]
 
