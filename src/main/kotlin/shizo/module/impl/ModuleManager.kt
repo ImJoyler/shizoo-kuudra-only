@@ -50,6 +50,7 @@ import shizo.module.impl.kuudra.qolplus.fireball.Fireball
 import shizo.module.impl.kuudra.qolplus.vesuvius.Jewing
 import shizo.module.impl.misc.*
 import shizo.module.impl.render.*
+import shizo.module.impl.render.customesp.CustomESP
 import java.io.File
 
 
@@ -108,7 +109,7 @@ object ModuleManager {
             PerformanceHUD, PlayerSize, Waypoints,
             //misc
             AutoJump, CommandKeybinds, CustomShortcuts, SlotBinds, WardrobeKeybinds, ZeroPingHS, CorpseESP, WorldScanner,
-            GhostBlocks, SeeThrough
+            GhostBlocks, SeeThrough, CustomESP
         )
 
         // hashmap, but would need to keep track when setting values change

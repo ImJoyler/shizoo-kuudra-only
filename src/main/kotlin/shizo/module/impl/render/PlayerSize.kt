@@ -25,6 +25,7 @@ import net.minecraft.client.model.GuardianModel
 import net.minecraft.client.model.dragon.EnderDragonModel
 import net.minecraft.client.model.geom.ModelLayers
 import net.minecraft.client.renderer.RenderType
+import net.minecraft.client.renderer.SubmitNodeCollector
 import net.minecraft.client.renderer.entity.state.AvatarRenderState
 import net.minecraft.client.renderer.entity.state.CopperGolemRenderState
 import net.minecraft.client.renderer.entity.state.EnderDragonRenderState
@@ -39,11 +40,14 @@ import net.minecraft.world.entity.animal.sniffer.Sniffer
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon
 import net.minecraft.world.entity.monster.ElderGuardian
 import net.minecraft.world.entity.monster.Ravager
+import net.minecraft.world.entity.monster.Zombie
 import net.minecraft.world.entity.monster.creaking.Creaking
 import net.minecraft.world.entity.monster.warden.Warden
 import net.minecraft.world.entity.player.Player
 import shizo.mixin.accessors.EntityRendererAccessor
+import shizo.utils.renderUtils.CustomModelRenderer
 import java.net.URI
+import java.util.UUID
 import kotlin.concurrent.thread
 import kotlin.math.cos
 import kotlin.math.sin
@@ -62,11 +66,12 @@ object PlayerSize : Module(
     private val devSizeY by NumberSetting("Size Y", 1f, -1f, 30f, 0.1f, desc = "Y scale.").withDependency { devSize }
     private val devSizeZ by NumberSetting("Size Z", 1f, -1f, 10f, 0.1f, desc = "Z scale.").withDependency { devSize }
 
+    private val ttsSwingMap = HashMap<UUID, Int>()
 
     val wardrobeLauncher = WardrobeLauncherSetting()
 
     var zooMode by BooleanSetting("Render Multiple Mobs", false, "").withDependency { false }
-    val devMob = SelectorSetting("Pet Mob", "None", arrayListOf("None", "Dragon", "Sniffer", "Warden", "Copper Golem", "Ravager", "Elder Guardian", "Creaking", "Breeze", "Frog", "Panda", "Llama", "Goat", "Parrot", "Glow Squid"),"").withDependency { false }
+    val devMob = SelectorSetting("Pet Mob", "None", arrayListOf("None", "Dragon", "Sniffer", "Warden", "Copper Golem", "Ravager", "Elder Guardian", "Creaking", "Breeze", "Frog", "Panda", "Llama", "Goat", "Parrot", "Glow Squid", "TTS"),"").withDependency { false }
 
     var hidePlayer by BooleanSetting("Hide Player", false,"").withDependency { false }
     var schizoMode by BooleanSetting("Schizo Mode", false, "").withDependency { false }
@@ -116,6 +121,9 @@ object PlayerSize : Module(
 
     var glowSquidToggle by BooleanSetting("Enable Glow Squid", false, "").withDependency { false }
     val glowSquidConfig = PetConfigSetting("Glow Squid Settings", 14).withDependency { false }
+
+    var ttsToggle by BooleanSetting("Enable TTTS", false, "").withDependency { false }
+    val ttsConfig = PetConfigSetting("TTTS Settings", 15).withDependency { false }
 
     var randoms: HashMap<String, RandomPlayer> = HashMap()
     private val copperSwingMap = HashMap<java.util.UUID, Int>()
@@ -289,7 +297,14 @@ object PlayerSize : Module(
         @SerializedName("GlowSquidSide") val glowSquidSide: Float = 0.0f,
         @SerializedName("GlowSquidPitch") val glowSquidPitch: Float = 0f,
         @SerializedName("GlowSquidDist") val glowSquidDist: Float = 0.0f,
-        @SerializedName("GlowSquidHeight") val glowSquidHeight: Float = 0.0f
+        @SerializedName("GlowSquidHeight") val glowSquidHeight: Float = 0.0f,
+
+        @SerializedName("TTS") val tts: Boolean = false,
+        @SerializedName("TTSSize") val ttsSize: Float = 1.0f,
+        @SerializedName("TTSSide") val ttsSide: Float = 0.0f,
+        @SerializedName("TTSPitch") val ttsPitch: Float = 0f,
+        @SerializedName("TTSDist") val ttsDist: Float = 0.0f,
+        @SerializedName("TTSHeight") val ttsHeight: Float = 0.0f
     )
 
     init {
@@ -309,6 +324,7 @@ object PlayerSize : Module(
         this.registerSetting(goatConfig)
         this.registerSetting(parrotConfig)
         this.registerSetting(glowSquidConfig)
+        this.registerSetting(ttsConfig)
 
         thread {
             try {
@@ -403,6 +419,12 @@ object PlayerSize : Module(
                 if (glowSquidModel == null) glowSquidModel = net.minecraft.client.model.SquidModel(mc.entityModels.bakeLayer(ModelLayers.GLOW_SQUID))
                 dummyGlowSquid?.tickCount = (dummyGlowSquid?.tickCount ?: 0) + 1
 
+//                if (dummyTts == null) dummyTts = net.minecraft.world.entity.monster.Zombie(EntityType.ZOMBIE, mc.level!!)
+//                if (ttsModel == null) {
+//                    ttsModel = TtsModel(TtsModel.createBodyLayer().bakeRoot())
+//                }
+//                dummyTts?.tickCount = (dummyTts?.tickCount ?: 0) + 1
+
             } catch (_: Exception) {}
         }
 
@@ -470,6 +492,10 @@ object PlayerSize : Module(
                         val d = glowSquidConfig.value
                         renderGlowSquid(player, context, d.size, d.pitch, d.yaw, d.dist, d.height, d.side)
                     }
+                    if ((!zooMode && devMob.value == 15) || (zooMode && ttsToggle)) {
+                        val d = ttsConfig.value
+                        renderTts(player, context, d.size, d.pitch, d.yaw, d.dist, d.height, d.side)
+                    }
                 } else if (hd != null) {
                     if (hd.dragon) renderDragon(player, context, hd.dragonSize, hd.dragonPitch, 0f, hd.dragonDist, hd.dragonHeight, hd.dragonSide)
                     if (hd.sniffer) renderSniffer(player, context, hd.snifferSize, hd.snifferPitch, 0f, hd.snifferDist, hd.snifferHeight, hd.snifferSide, hd.snifferBaby)
@@ -485,12 +511,72 @@ object PlayerSize : Module(
                     if (hd.goat) renderGoat(player, context, hd.goatSize, hd.goatPitch, 0f, hd.goatDist, hd.goatHeight, hd.goatSide)
                     if (hd.parrot) renderParrot(player, context, hd.parrotSize, hd.parrotPitch, 0f, hd.parrotDist, hd.parrotHeight, hd.parrotSide)
                     if (hd.glowSquid) renderGlowSquid(player, context, hd.glowSquidSize, hd.glowSquidPitch, 0f, hd.glowSquidDist, hd.glowSquidHeight, hd.glowSquidSide)
+                    if (hd.tts) renderTts(player, context, hd.ttsSize, hd.ttsPitch, 0f, hd.ttsDist, hd.ttsHeight, hd.ttsSide)
                 }
             }
         }
     }
+    private fun renderTts(player: Player, ctx: WorldRenderContext, size: Float, pitch: Float, yaw: Float, dist: Float, height: Float, side: Float) {
+        val path = CustomModelRenderer.ALL_MODEL_PATHS["Tung Tung Sahur"] ?: return
+        val partialTick = mc.deltaTracker.getGameTimeDeltaPartialTick(true)
+        val isMe = player == mc.player
+        if (isMe && mc.options.cameraType.isFirstPerson) return
+        val uuid = player.uuid
+        if (player.swingTime == 1) {
+            val lastStart = ttsSwingMap[uuid] ?: -100
+            if (player.tickCount - lastStart > 20) ttsSwingMap[uuid] = player.tickCount
+        }
 
-    private inline fun renderPetWrapper(
+        val animStartTick = ttsSwingMap[uuid]
+        var hitProgress = 0f
+
+        if (animStartTick != null && player.tickCount - animStartTick <= 20) {
+            val elapsedTicks = (player.tickCount - animStartTick) + partialTick
+            hitProgress = (elapsedTicks / 8f).coerceIn(0f, 1f)
+        }
+
+        val bodyRot = Mth.rotLerp(partialTick, player.yBodyRotO, player.yBodyRot)
+        val headRot = Mth.rotLerp(partialTick, player.yHeadRotO, player.yHeadRot)
+        val yawDiff = Mth.wrapDegrees(headRot - bodyRot)
+        val smoothedYaw = bodyRot + (yawDiff * 0.6f)
+
+        val bufferSource = ctx.consumers() as? net.minecraft.client.renderer.MultiBufferSource ?: return
+
+        val matrix = ctx.matrices()
+        matrix.pushPose()
+
+        val yawRad = Math.toRadians(bodyRot.toDouble())
+        val distH = size * dist
+        val distSide = size * side
+        val rX = Mth.lerp(partialTick.toDouble(), player.xo, player.x) + (-sin(yawRad) * distH) + (-cos(yawRad) * distSide)
+        val rY = Mth.lerp(partialTick.toDouble(), player.yo, player.y) + height
+        val rZ = Mth.lerp(partialTick.toDouble(), player.zo, player.z) + (cos(yawRad) * distH) + (-sin(yawRad) * distSide)
+
+        val camPos = mc.gameRenderer.mainCamera.position
+        matrix.translate(rX - camPos.x, rY - camPos.y, rZ - camPos.z)
+
+        CustomModelRenderer.submit(
+            modelPath = path,
+            poseStack = matrix,
+            collector = bufferSource,
+            bodyRot = smoothedYaw,
+            lightCoords = 15728880,
+            walkAnimSpeed = player.walkAnimation.speed(partialTick),
+            walkAnimPos = player.walkAnimation.position(partialTick) * 0.001f,
+
+            hitAnimProgress = hitProgress,
+
+            scale = size,
+            offsetX = side,
+            offsetY = height,
+            offsetZ = dist,
+            rotationX = 0f,
+            rotationY = yaw,
+            rotationZ = 0f
+        )
+
+        matrix.popPose()
+    }    private inline fun renderPetWrapper(
         player: Player, context: WorldRenderContext,
         dummyEntity: net.minecraft.world.entity.Entity,
         scale: Float, pitch: Float, yaw: Float, distMult: Float, heightOff: Float, sideOff: Float,
@@ -793,20 +879,21 @@ object PlayerSize : Module(
             12 -> goatConfig
             13 -> parrotConfig
             14 -> glowSquidConfig
+            15 -> ttsConfig
             else -> null
         }
     }
 
     fun cyclePet(forward: Boolean) {
         var next = devMob.value + (if (forward) 1 else -1)
-        if (next > 14) next = 1
-        if (next < 1) next = 14
+        if (next > 15) next = 0
+        if (next < 0) next = 15
         devMob.value = next
     }
 
     fun isCurrentPetZooEnabled(): Boolean {
         return when (devMob.value) {
-            1 -> dragonToggle; 2 -> snifferToggle; 3 -> wardenToggle; 4 -> copperToggle; 5 -> ravagerToggle; 6 -> egToggle; 7 -> creakingToggle; 8 -> breezeToggle; 9 -> frogToggle; 10 -> pandaToggle; 11 -> llamaToggle; 12 -> goatToggle; 13 -> parrotToggle; 14 -> glowSquidToggle; else -> false
+            1 -> dragonToggle; 2 -> snifferToggle; 3 -> wardenToggle; 4 -> copperToggle; 5 -> ravagerToggle; 6 -> egToggle; 7 -> creakingToggle; 8 -> breezeToggle; 9 -> frogToggle; 10 -> pandaToggle; 11 -> llamaToggle; 12 -> goatToggle; 13 -> parrotToggle; 14 -> glowSquidToggle; 15 -> ttsToggle else -> false
         }
     }
     fun toggleCurrentPetZoo() {
@@ -825,6 +912,7 @@ object PlayerSize : Module(
             12 -> goatToggle = !goatToggle
             13 -> parrotToggle = !parrotToggle
             14 -> glowSquidToggle = !glowSquidToggle
+            15 -> ttsToggle = !ttsToggle
         }
     }
     @JvmStatic

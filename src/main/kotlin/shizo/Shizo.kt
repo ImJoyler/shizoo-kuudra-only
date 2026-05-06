@@ -13,6 +13,7 @@
     import shizo.commands.crateCommand
     import shizo.commands.croesusCommand
     import shizo.commands.dungeonHub
+    import shizo.commands.espCommand
     import shizo.commands.floorJoinCommand
     import shizo.commands.jewCommand
     import shizo.commands.kuudraJoinCommand
@@ -41,6 +42,7 @@
     import shizo.utils.handlers.SbStatTracker
     import shizo.utils.handlers.TickTasks
     import shizo.utils.network.WebUtils.postData
+    import shizo.utils.renderUtils.CustomModelRenderer
     import shizo.utils.renderUtils.renderUtils.CustomRenderLayer
     import shizo.utils.renderUtils.renderUtils.CustomRenderPipelines
     import shizo.utils.renderUtils.renderUtils.IrisCompatability
@@ -104,6 +106,7 @@
                     croesusCommand,
                     pfCommand,
                     trackerCommand,
+                    espCommand
                 ).forEach { commodore -> commodore.register(dispatcher) }
             }
 
@@ -114,7 +117,7 @@
                 RenderBatchManager, TerminalUtils,
                 LeapUtils, Executor, RotationUtils, KuudraUtils, NPCUtils, ItemSwapTacker, EtherUtils, CameraHandler,
                 SbStatTracker, FireballUtils, CustomRenderLayer, CustomRenderPipelines, RenderBatchManager,
-                IrisCompatability
+                IrisCompatability, CustomModelRenderer
 
             ).forEach { EventBus.subscribe(it) }
 
