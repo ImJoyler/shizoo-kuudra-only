@@ -122,8 +122,8 @@ object PlayerSize : Module(
     var glowSquidToggle by BooleanSetting("Enable Glow Squid", false, "").withDependency { false }
     val glowSquidConfig = PetConfigSetting("Glow Squid Settings", 14).withDependency { false }
 
-    var ttsToggle by BooleanSetting("Enable TTTS", false, "").withDependency { false }
-    val ttsConfig = PetConfigSetting("TTTS Settings", 15).withDependency { false }
+    var ttsToggle by BooleanSetting("Enable TTS", false, "").withDependency { false }
+    val ttsConfig = PetConfigSetting("TTS Settings", 15).withDependency { false }
 
     var randoms: HashMap<String, RandomPlayer> = HashMap()
     private val copperSwingMap = HashMap<java.util.UUID, Int>()
@@ -303,6 +303,7 @@ object PlayerSize : Module(
         @SerializedName("TTSSize") val ttsSize: Float = 1.0f,
         @SerializedName("TTSSide") val ttsSide: Float = 0.0f,
         @SerializedName("TTSPitch") val ttsPitch: Float = 0f,
+        @SerializedName("TTSYaw") val ttsYaw: Float = 0f,
         @SerializedName("TTSDist") val ttsDist: Float = 0.0f,
         @SerializedName("TTSHeight") val ttsHeight: Float = 0.0f
     )
@@ -379,6 +380,7 @@ object PlayerSize : Module(
                 if (dummyRavager == null) dummyRavager = Ravager(EntityType.RAVAGER, mc.level!!)
                 if (ravagerModel == null) ravagerModel = RavagerModel(mc.entityModels.bakeLayer(ModelLayers.RAVAGER))
                 dummyRavager?.tickCount = (dummyRavager?.tickCount ?: 0) + 1
+
 
                 if (dummyEG == null) dummyEG = ElderGuardian(EntityType.ELDER_GUARDIAN, mc.level!!)
                 if (egModel == null) egModel = GuardianModel(mc.entityModels.bakeLayer(ModelLayers.ELDER_GUARDIAN))
@@ -511,7 +513,7 @@ object PlayerSize : Module(
                     if (hd.goat) renderGoat(player, context, hd.goatSize, hd.goatPitch, 0f, hd.goatDist, hd.goatHeight, hd.goatSide)
                     if (hd.parrot) renderParrot(player, context, hd.parrotSize, hd.parrotPitch, 0f, hd.parrotDist, hd.parrotHeight, hd.parrotSide)
                     if (hd.glowSquid) renderGlowSquid(player, context, hd.glowSquidSize, hd.glowSquidPitch, 0f, hd.glowSquidDist, hd.glowSquidHeight, hd.glowSquidSide)
-                    if (hd.tts) renderTts(player, context, hd.ttsSize, hd.ttsPitch, 0f, hd.ttsDist, hd.ttsHeight, hd.ttsSide)
+                    if (hd.tts) renderTts(player, context, hd.ttsSize, hd.ttsPitch, hd.ttsYaw, hd.ttsDist, hd.ttsHeight, hd.ttsSide)
                 }
             }
         }
