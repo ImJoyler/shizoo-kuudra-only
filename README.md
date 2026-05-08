@@ -6,3 +6,5 @@ maybe if i can be bothered ill also port drone and shit
 # Copyright
 The mod base is odin from odtheking
 as for whajt i made idrc use it
+# Changelog
+added TTTs, myth now stop bothering me pls ty :D
